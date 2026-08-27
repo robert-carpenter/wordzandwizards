@@ -90,13 +90,17 @@ export function initializeBackend(
     next();
   });
   app.use(
-    cors({
-      credentials: true,
-      origin(origin, callback) {
-        if (!origin || config.allowedOrigins.has(origin)) return callback(null, true);
+    cors<Request>((req, callback) => {
+      const origin = req.get("Origin");
+      const requestOrigin = `${req.protocol}://${req.get("host")}`;
+      if (origin && origin !== requestOrigin && !config.allowedOrigins.has(origin)) {
         return callback(new Error("Origin is not allowed."));
-      },
-      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+      }
+      return callback(null, {
+        credentials: true,
+        origin: true,
+        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+      });
     })
   );
   app.use(express.json({ limit: "16kb" }));

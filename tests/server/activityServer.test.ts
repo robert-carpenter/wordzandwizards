@@ -41,6 +41,17 @@ describe("Activity server", () => {
     expect(response.body.code).toBe("ORIGIN_REJECTED");
   });
 
+  it("allows requests from the server's own public origin", async () => {
+    const response = await request(server)
+      .get("/api/health")
+      .set("Host", "wordsandwizards.app")
+      .set("X-Forwarded-Proto", "https")
+      .set("Origin", "https://wordsandwizards.app");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://wordsandwizards.app");
+  });
+
   it("creates and resumes one room per instance using the verified user", async () => {
     const avatar = "https://cdn.discordapp.com/embed/avatars/0.png";
     await authenticate(host, "user-1", "Host Wizard", "instance-1", avatar);
