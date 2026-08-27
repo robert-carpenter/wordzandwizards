@@ -48,7 +48,7 @@ These cannot be completed from source code without the Discord application owner
 3. Set `/` URL mappings for the development tunnel, staging host, and production host.
 4. Provide server-only secrets through the hosting secret manager.
 5. Upload icon, cover, embedded background, screenshots/video, and public Activity metadata.
-6. Publish Privacy Policy, Terms of Service, support, and distribution information.
+6. Enter `https://wordsandwizards.app/privacy` and `https://wordsandwizards.app/terms` in the Developer Portal, and configure the `support@wordsandwizards.app` mailbox or forwarding alias.
 7. Complete a real Discord proxy test with at least two Discord accounts.
 8. Complete the six-user staging gate before broader distribution.
 9. Keep one server replica until shared authoritative room state and distributed mutation/version control are implemented.

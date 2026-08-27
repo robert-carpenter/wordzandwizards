@@ -147,7 +147,7 @@ Developer Portal tasks:
 - Configure the URL mapping `/` to the host that serves the existing combined client/API/Socket.IO deployment. Because one origin serves everything, a root mapping covers hashed assets, `/api/*`, and `/socket.io/*`.
 - For proxy-based local development, map `/` to a temporary HTTPS tunnel target. Reset mappings when a temporary domain is no longer controlled.
 - Upload application icon, Activity cover art, embedded background, and optional preview video. Set the public Activity name, description, and participant count.
-- Add public Terms of Service, Privacy Policy, and support links before distribution/discovery.
+- Publish the implemented `/terms` and `/privacy` pages and configure the `support@wordsandwizards.app` mailbox before distribution/discovery.
 
 Environment contract:
 

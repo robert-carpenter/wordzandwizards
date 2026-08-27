@@ -35,7 +35,13 @@ export async function startActivityApp() {
   const testMode = import.meta.env.DEV && import.meta.env.VITE_ACTIVITY_TEST_MODE === "true";
   if (!testMode && isTopLevelWindow()) {
     document.body.classList.add("app-ready", "web-landing-mode");
-    renderWebLanding(app);
+    const legalPage = getLegalPage(window.location.pathname);
+    if (legalPage) {
+      document.body.classList.add("web-legal-mode");
+      renderLegalPage(app, legalPage);
+    } else {
+      renderWebLanding(app);
+    }
     return;
   }
 
@@ -527,15 +533,12 @@ function renderStartupFailure(app: HTMLDivElement, error: unknown) {
 }
 
 function renderWebLanding(app: HTMLDivElement) {
-  document.title = "Words & Wizards — Play on Discord";
+  setPageMetadata(
+    "Words & Wizards — Play on Discord",
+    "Install Words & Wizards and play the social word-spelling game directly inside Discord."
+  );
   const landing = createElement("main", "web-landing");
-
-  const brand = createElement("header", "web-landing__brand");
-  const logo = document.createElement("img");
-  logo.src = logoUrl;
-  logo.alt = "Words & Wizards";
-  logo.className = "web-landing__logo";
-  brand.append(logo);
+  const brand = createWebBrand();
 
   const hero = createElement("section", "web-landing__hero");
   const heroCopy = createElement("div", "web-landing__hero-copy");
@@ -606,8 +609,305 @@ function renderWebLanding(app: HTMLDivElement) {
   instructions.append(steps, discoveryNote);
   hero.append(heroCopy, instructions);
 
-  landing.append(brand, hero);
+  landing.append(brand, hero, createSiteFooter("home"));
   app.replaceChildren(landing);
+}
+
+type LegalPage = "terms" | "privacy";
+
+interface LegalSection {
+  heading: string;
+  paragraphs: string[];
+  bullets?: string[];
+  contact?: boolean;
+}
+
+const LEGAL_CONTACT_EMAIL = "support@wordsandwizards.app";
+const LEGAL_UPDATED = "August 27, 2026";
+
+function getLegalPage(pathname: string): LegalPage | undefined {
+  const normalized = pathname.toLowerCase().replace(/\/+$/, "") || "/";
+  if (normalized === "/terms" || normalized === "/terms-of-service") return "terms";
+  if (normalized === "/privacy" || normalized === "/privacy-policy") return "privacy";
+  return undefined;
+}
+
+function renderLegalPage(app: HTMLDivElement, page: LegalPage) {
+  const isTerms = page === "terms";
+  const title = isTerms ? "Terms of Service" : "Privacy Policy";
+  const description = isTerms
+    ? "Terms governing use of the Words & Wizards Discord Activity."
+    : "How the Words & Wizards Discord Activity collects, uses, shares, and retains information.";
+  setPageMetadata(`${title} — Words & Wizards`, description);
+
+  const shell = createElement("main", "web-legal");
+  const article = createElement("article", "web-legal__document");
+  const header = createElement("header", "web-legal__document-header");
+  header.append(
+    createElement("div", "web-legal__eyebrow", "Words & Wizards"),
+    createElement("h1", "web-legal__title", title),
+    createElement("p", "web-legal__updated", `Last updated ${LEGAL_UPDATED}`),
+    createElement(
+      "p",
+      "web-legal__summary",
+      isTerms
+        ? "These terms explain the rules for using the Words & Wizards Discord Activity."
+        : "We collect only the Discord identity, session, and gameplay information needed to run the Activity. We do not sell personal information or use it for advertising."
+    )
+  );
+  article.append(header);
+
+  const sections = isTerms ? getTermsSections() : getPrivacySections();
+  sections.forEach((section, index) => {
+    const sectionElement = createElement("section", "web-legal__section");
+    sectionElement.id = `${index + 1}-${slugify(section.heading)}`;
+    sectionElement.append(createElement("h2", "web-legal__section-title", section.heading));
+    section.paragraphs.forEach((paragraph) => {
+      sectionElement.append(createElement("p", "web-legal__paragraph", paragraph));
+    });
+    if (section.bullets?.length) {
+      const list = createElement("ul", "web-legal__list");
+      section.bullets.forEach((item) => list.append(createElement("li", "web-legal__list-item", item)));
+      sectionElement.append(list);
+    }
+    if (section.contact) sectionElement.append(createLegalContact());
+    article.append(sectionElement);
+  });
+
+  shell.append(createWebBrand(), article, createSiteFooter(page));
+  app.replaceChildren(shell);
+}
+
+function getTermsSections(): LegalSection[] {
+  return [
+    {
+      heading: "Acceptance of these terms",
+      paragraphs: [
+        "These Terms of Service (\"Terms\") govern your access to and use of Words & Wizards, including its Discord Activity, website, and related services (collectively, the \"Service\"). By installing, launching, or using the Service, you agree to these Terms. If you do not agree, do not use the Service.",
+        "If you use the Service for an organization, you represent that you have authority to accept these Terms for that organization."
+      ]
+    },
+    {
+      heading: "Eligibility and Discord",
+      paragraphs: [
+        "You must meet the minimum age required to use Discord in your country and be permitted to use Discord under its terms. If local law requires consent from a parent or guardian, you must have that consent.",
+        "Words & Wizards is an independent application and is not endorsed by or affiliated with Discord Inc. Your use of Discord remains subject to Discord's Terms of Service, Community Guidelines, and other applicable policies. These Terms do not replace or modify your agreement with Discord."
+      ]
+    },
+    {
+      heading: "The Service",
+      paragraphs: [
+        "Words & Wizards is a multiplayer word-spelling game that runs inside Discord. Players join an Activity instance, form words from a shared board, use game abilities, and may exchange in-game chat messages.",
+        "The Service may be changed, interrupted, limited, or discontinued at any time. Features, rules, availability, and supported Discord clients may change as the game and Discord platform evolve."
+      ]
+    },
+    {
+      heading: "Acceptable use",
+      paragraphs: ["You agree to use the Service lawfully and in a way that does not harm other players, the Service, or Discord."],
+      bullets: [
+        "Do not harass, threaten, impersonate, or abuse another person.",
+        "Do not submit unlawful, hateful, sexually explicit, infringing, or otherwise harmful content through chat or other inputs.",
+        "Do not exploit bugs, automate gameplay, manipulate scores, or interfere with fair play.",
+        "Do not probe, overload, disrupt, reverse engineer, or attempt unauthorized access to the Service or another user's session.",
+        "Do not use the Service to violate Discord's rules or any applicable law."
+      ]
+    },
+    {
+      heading: "Your content and conduct",
+      paragraphs: [
+        "You remain responsible for words, chat messages, and other content you submit. You retain any rights you already have in that content and grant us a limited, non-exclusive permission to process and display it only as needed to operate the current game session, protect the Service, and comply with law.",
+        "We may remove content, end sessions, or restrict access when reasonably necessary to enforce these Terms, protect users, or keep the Service secure."
+      ]
+    },
+    {
+      heading: "Intellectual property",
+      paragraphs: [
+        "The Service, including its software, game design, artwork, branding, and other materials, is owned by the Words & Wizards operator or its licensors and is protected by applicable intellectual-property laws. These Terms give you a limited, revocable, non-transferable right to use the Service for personal, non-commercial play; they do not transfer ownership."
+      ]
+    },
+    {
+      heading: "Privacy",
+      paragraphs: [
+        "Our Privacy Policy explains what information the Service processes and how it is used, shared, retained, and deleted. By using the Service, you acknowledge those practices."
+      ]
+    },
+    {
+      heading: "Disclaimers",
+      paragraphs: [
+        "To the fullest extent permitted by law, the Service is provided \"as is\" and \"as available.\" We do not promise that it will always be available, uninterrupted, secure, or error-free, or that every result, score, or word ruling will be accurate.",
+        "Nothing in these Terms excludes warranties or rights that cannot legally be excluded."
+      ]
+    },
+    {
+      heading: "Limitation of liability",
+      paragraphs: [
+        "To the fullest extent permitted by law, the Words & Wizards operator will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for loss of data, goodwill, profits, or opportunities arising from the Service. Any liability that cannot be excluded will be limited to the minimum amount permitted by applicable law."
+      ]
+    },
+    {
+      heading: "Suspension and termination",
+      paragraphs: [
+        "You may stop using or uninstall the Service at any time. We may suspend or terminate access when you violate these Terms, create security or legal risk, harm other users, or when continued operation is no longer practical. Provisions that by their nature should survive termination will continue to apply."
+      ]
+    },
+    {
+      heading: "Changes and general terms",
+      paragraphs: [
+        "We may update these Terms as the Service or legal requirements change. The date above shows the latest revision. Continued use after an update means you accept the revised Terms; if you do not agree, stop using the Service.",
+        "If part of these Terms is unenforceable, the remaining provisions remain effective. A failure to enforce a provision is not a waiver. These Terms and the Privacy Policy form the agreement between you and the Words & Wizards operator regarding the Service, subject to rights that cannot be waived under applicable law."
+      ]
+    },
+    {
+      heading: "Contact",
+      paragraphs: ["Questions about these Terms can be sent to:"],
+      contact: true
+    }
+  ];
+}
+
+function getPrivacySections(): LegalSection[] {
+  return [
+    {
+      heading: "Scope",
+      paragraphs: [
+        "This Privacy Policy explains how Words & Wizards (\"we,\" \"us,\" or \"our\") processes information when you use the Words & Wizards Discord Activity, website, and related services. It does not govern Discord's own processing; Discord's Privacy Policy applies to Discord's services."
+      ]
+    },
+    {
+      heading: "Information we process",
+      paragraphs: ["We process the following limited categories of information to provide the Service:"],
+      bullets: [
+        "Discord identity data: your Discord user ID, username, display name, and avatar URL.",
+        "Activity session data: the Discord Activity instance ID, a random session ID, join and connection status, host status, and session timestamps.",
+        "Authentication data: the Discord authorization code and access token are processed transiently to verify the launch and authenticate the Discord SDK. They are not stored in room records or a persistent database.",
+        "Gameplay data: scores, gems, turns, selected tiles, submitted words, game settings, and other state needed to synchronize a match.",
+        "Content you submit: in-game chat messages and other text entered into the Activity.",
+        "Technical data: IP address, browser or client information, request timestamps, request identifiers, cookie data, and diagnostic or security events that may be processed by our server and hosting provider."
+      ]
+    },
+    {
+      heading: "How we use information",
+      paragraphs: ["We use the information above only for the following purposes:"],
+      bullets: [
+        "Authenticate your Discord Activity launch and associate you with the correct Activity instance.",
+        "Create and synchronize multiplayer rooms, gameplay, chat, scores, and host controls.",
+        "Maintain session security, prevent replay or unauthorized access, enforce rate limits, and investigate abuse or failures.",
+        "Operate, troubleshoot, protect, and improve the reliability of the Service.",
+        "Comply with legal obligations and enforce our Terms of Service."
+      ]
+    },
+    {
+      heading: "How we share information",
+      paragraphs: [
+        "We do not sell personal information, serve behavioral advertising, or share personal information with data brokers.",
+        "Information may be processed by Discord to operate the Activity and by infrastructure providers that host and deliver the Service, currently including Railway. Those providers process information under their own terms and privacy policies. We may also disclose information when required by law, to protect users or the Service, or in connection with a reorganization or transfer of the Service subject to appropriate safeguards."
+      ]
+    },
+    {
+      heading: "Storage and retention",
+      paragraphs: [
+        "Words & Wizards does not currently use a persistent user or gameplay database. Room, gameplay, player, and chat state is held in server memory while an Activity room exists. A disconnected player is normally removed after approximately five minutes, and the room and its content are deleted when the last player leaves or is removed. In-memory state is also erased when the server restarts.",
+        "The signed Activity session cookie contains your session and Discord identity details and expires after six hours. Leaving the Activity clears that cookie through the Service. Discord, your browser, and infrastructure providers may retain their own records for different periods under their policies and operational settings.",
+        "If persistent storage or analytics are added later, this policy will be updated before those practices are introduced."
+      ]
+    },
+    {
+      heading: "Cookies",
+      paragraphs: [
+        "The Service uses one strictly necessary, signed session cookie to keep your authenticated Activity session connected to the correct Discord user and Activity instance. It is secure in production and is not used for advertising or cross-site tracking. The Service does not currently use analytics or marketing cookies."
+      ]
+    },
+    {
+      heading: "Your choices and deletion requests",
+      paragraphs: [
+        "You can stop current gameplay processing by leaving the Activity. When all players leave or disconnect, the in-memory room and chat data are removed as described above.",
+        "You may request access to or deletion of personal information under applicable law by contacting us. Include your Discord user ID and enough detail to identify the request, but do not send your Discord password, bot token, OAuth token, or other credentials. Because the Service is primarily ephemeral, we may have no persistent gameplay record to locate. We may need to verify that a request relates to you before responding."
+      ],
+      contact: true
+    },
+    {
+      heading: "Security",
+      paragraphs: [
+        "We use safeguards designed for the limited data we process, including signed, time-limited sessions, secure production cookies, authorization-code replay protection, origin checks, input limits, and rate limiting. No system is perfectly secure, so we cannot guarantee absolute security. If you believe the Service or your data may have been compromised, contact us promptly."
+      ]
+    },
+    {
+      heading: "Children's privacy",
+      paragraphs: [
+        "The Service is intended only for people who are old enough to use Discord under Discord's rules and applicable law. We do not knowingly collect information from anyone below that minimum age. If you believe a child has provided information in violation of those requirements, contact us so we can investigate and delete any information we control."
+      ]
+    },
+    {
+      heading: "International processing",
+      paragraphs: [
+        "Discord and our hosting infrastructure may process information in countries other than the one where you live. Those countries may have different data-protection laws. Where required, service providers are responsible for using appropriate safeguards for their processing."
+      ]
+    },
+    {
+      heading: "Changes to this policy",
+      paragraphs: [
+        "We may update this Privacy Policy when the Service, our data practices, or legal requirements change. We will post the revised policy here and update the date above. Material changes will be communicated through the Service or another reasonable channel when required."
+      ]
+    },
+    {
+      heading: "Contact",
+      paragraphs: ["For privacy questions, rights requests, or security reports, contact:"],
+      contact: true
+    }
+  ];
+}
+
+function createWebBrand(): HTMLElement {
+  const brand = createElement("header", "web-landing__brand");
+  const home = createElement("a", "web-landing__brand-link") as HTMLAnchorElement;
+  home.href = "/";
+  home.setAttribute("aria-label", "Words & Wizards home");
+  const logo = document.createElement("img");
+  logo.src = logoUrl;
+  logo.alt = "Words & Wizards";
+  logo.className = "web-landing__logo";
+  home.append(logo);
+  brand.append(home);
+  return brand;
+}
+
+function createSiteFooter(current: "home" | LegalPage): HTMLElement {
+  const footer = createElement("footer", "web-site-footer");
+  const copyright = createElement("span", "web-site-footer__copyright", "© 2026 Words & Wizards");
+  const nav = createElement("nav", "web-site-footer__links");
+  nav.setAttribute("aria-label", "Legal and support links");
+  nav.append(
+    createFooterLink("/", "Home", current === "home"),
+    createFooterLink("/terms", "Terms of Service", current === "terms"),
+    createFooterLink("/privacy", "Privacy Policy", current === "privacy"),
+    createFooterLink(`mailto:${LEGAL_CONTACT_EMAIL}`, "Support")
+  );
+  footer.append(copyright, nav);
+  return footer;
+}
+
+function createFooterLink(href: string, label: string, current = false): HTMLAnchorElement {
+  const link = createElement("a", "web-site-footer__link", label) as HTMLAnchorElement;
+  link.href = href;
+  if (current) link.setAttribute("aria-current", "page");
+  return link;
+}
+
+function createLegalContact(): HTMLElement {
+  const contact = createElement("p", "web-legal__contact");
+  const link = createElement("a", "web-legal__contact-link", LEGAL_CONTACT_EMAIL) as HTMLAnchorElement;
+  link.href = `mailto:${LEGAL_CONTACT_EMAIL}`;
+  contact.append(link);
+  return contact;
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function setPageMetadata(title: string, description: string) {
+  document.title = title;
+  document.querySelector<HTMLMetaElement>('meta[name="description"]')?.setAttribute("content", description);
 }
 
 function createLandingLink(

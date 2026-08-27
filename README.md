@@ -165,6 +165,14 @@ Do not set `ACTIVITY_TEST_MODE` or `VITE_ACTIVITY_TEST_MODE` in Railway. Railway
 
 For the current unlisted rollout, enable **Public Bot**, keep both installation contexts enabled, select **Discord Provided Link**, and leave **Discovery** disabled. The website exposes that direct installation link without listing the Activity in public search. Installation does not bypass Discord's unverified-Activity rule: launching remains limited to approved App Testers and development-team members until Discord verifies the Activity.
 
+Public legal and support links for the Discord Developer Portal:
+
+- Terms of Service: `https://wordsandwizards.app/terms`
+- Privacy Policy: `https://wordsandwizards.app/privacy`
+- Support and privacy requests: `support@wordsandwizards.app`
+
+Configure the `support@wordsandwizards.app` mailbox or forwarding alias before submitting the app for verification. The Privacy Policy describes the current ephemeral, in-memory storage model; update it before adding persistent storage, analytics, advertising, or new data-sharing providers.
+
 Recommended Railway service settings:
 
 - Keep exactly one replica while rooms remain in memory.
@@ -176,7 +184,7 @@ In the Discord Developer Portal, map Activity prefix `/` to `wordsandwizards.app
 
 Set all server credentials in the hosting platform secret manager. Before release, verify the built client contains none of `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, or `SESSION_SECRET`, and complete a real proxy session covering invite, two users, gameplay, reconnect, host transfer, and leave.
 
-The remaining Developer Portal, artwork, Privacy Policy, Terms of Service, staging mapping, and distribution steps are tracked in `docs/discord-activity-migration-plan.md`.
+The remaining Developer Portal, staging mapping, and distribution steps are tracked in `docs/discord-activity-migration-plan.md`.
 
 ## Primary Discord references
 
