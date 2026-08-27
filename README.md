@@ -1,119 +1,187 @@
-# Spellcast Clone
+# Words & Wizards Discord Activity
 
-A multiplayer and offline word-building game inspired by Boggle/Scrabble mechanics. Players spell words on a 5x5 board, earn points, collect gems, and use power-ups. The project includes a Three.js-powered board, custom animations, Discord OAuth login, and a Vite-powered client/server build.
+Words & Wizards is a Discord Activity: a multiplayer word game that runs inside Discord using the Embedded App SDK. Players in the same Discord Activity instance share one authoritative server room, spell words on a 5×5 Three.js board, earn gems, and use power-ups.
 
-## Features
+Discord Activity mode is the only supported product runtime. Browser OAuth, names, public room codes, room browsing, copied web invites, and offline play are not part of the supported application flow.
 
-- **Game Modes**: Offline play or hosted multiplayer rooms with round-based turns.
-- **Board Mechanics**: 5x5 board with letter bag distribution, gems, letter multipliers, and rotating double-word (2W) tile per round.
-- **Power-ups**: Shuffle (costs 1 gem) and Swap Letter (costs 3 gems).
-- **Animations**: Submission word draw animation with stroke-drawn letters, sparkles, underline reveal, and fly-off to the scoring player.
-- **UI Theme**: Bright blue/yellow theme with wizard background, responsive scaling, and themed modals/menus.
-- **Discord OAuth**: Optional login that auto-fills player name and bypasses name prompts; session persistence with login/logout.
-- **Dictionary Search**: In-game modal to search dictionary entries (min 2 chars).
-- **Kicking/Skipping**: Host-only kick and skip-turn controls with confirmation modals.
-- **Shared rules**: Offline and multiplayer both use the same rule engine (exported from `src/shared/rules.ts`), with tests covering server/offline/shared flows.
+## Architecture
 
-## Tech Stack
+- `src/activity/` owns the Discord SDK handshake, authorize/authenticate flow, layout/thermal subscriptions, development harness, and Activity UI.
+- `src/server/activityAuth.ts` exchanges the single-use OAuth code, resolves `/users/@me`, verifies Activity instance membership, and issues the application session.
+- `src/server/activitySession.ts` signs and verifies the short-lived HttpOnly session cookie.
+- `src/server/server.ts` keys rooms by verified Discord `instanceId` and derives every HTTP and Socket.IO actor from that session.
+- `src/game/SpellcastGame.ts` and `src/game/WordBoard.ts` retain the game presentation and input code.
+- `src/shared/rules.ts` remains authoritative for online rules on the server.
 
-- **Client**: TypeScript, Vite, Three.js, GSAP for animations, FontAwesome icons, CSS custom theme.
-- **Server**: Node/Express (Vite SSR build), Socket.io for realtime multiplayer, dotenv for config.
+The MVP server is intentionally single-replica and keeps active rooms in memory. A restart ends active matches. Shared state and distributed mutation/version control are required before horizontal scaling.
 
-## Getting Started
+## Requirements
 
-### Prerequisites
-
-- Node.js 18+
+- Node.js 24 LTS
 - npm
+- A development Discord application with Activities enabled for real Discord testing
 
-### Install
+Install dependencies with:
 
-```bash
-npm install
+```powershell
+npm ci
 ```
 
-### Development
+## Public landing-page preview
 
-```bash
-npm run dev         # start Vite client dev server
-npm run dev -- --host  # if you need LAN access
+The public website can be previewed without Discord credentials:
+
+```powershell
+npm run dev
 ```
 
-Server-side code is built via `npm run build:server` (see Build below) but during dev you typically run the client dev server and the socket/express server together if you have a dev script; otherwise use `npm run dev` for client and a separate node process for the server entry if configured.
+Open [http://localhost:8900](http://localhost:8900). When the four server-only Activity variables are not configured, Vite serves the landing page without starting the authenticated Activity backend. To exercise the game locally, use the test harness below instead.
 
-### Build
+## Fast local Activity test harness
 
-```bash
-npm run build          # builds client and server
-npm run build:client   # client only
-npm run build:server   # server only
+The harness replaces only the Discord iframe RPC and Discord API verification. It still exercises the Activity bootstrap, server session cookie, instance-scoped room, authenticated HTTP API, authenticated Socket.IO connection, lobby, and game.
+
+```powershell
+npm run dev:activity-test
 ```
 
-### Run Production Build
+Open [http://localhost:8900](http://localhost:8900). The default fake identity is `Test Wizard` in `activity-test-instance-1`.
 
-```bash
-npm run start   # serves dist/server/index.mjs (after build)
+The harness accepts development-only query parameters:
+
+```text
+http://localhost:8900/?instance=table-1&user=wizard-1&name=Merlin
 ```
 
-## Configuration
+- `instance` selects the fake Activity instance.
+- `user` selects the fake verified Discord user ID.
+- `name` selects the display name.
+- `avatar` optionally supplies an encoded HTTP(S) avatar URL for testing the Discord photo treatment.
 
-Environment variables (example `.env`):
+Use a separate browser profile or private window for a second simultaneous user because the Activity session is stored in an HttpOnly cookie. The Invite Friends button copies a harness URL for the same instance. Both `VITE_ACTIVITY_TEST_MODE` and `ACTIVITY_TEST_MODE` are required, and production startup rejects test mode.
 
+## Real Discord development
+
+Copy `.env.example` to an ignored `.env.local` or configure equivalent environment variables in your shell/hosting platform. Never commit credentials.
+
+Required values:
+
+```dotenv
+VITE_DISCORD_CLIENT_ID=
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_BOT_TOKEN=
+SESSION_SECRET=
 ```
-SESSION_SECRET=change-me
-DISCORD_CLIENT_ID=your_discord_client_id
-DISCORD_CLIENT_SECRET=your_discord_client_secret
-DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
-BASE_URL=http://localhost:3000
+
+`SESSION_SECRET` must contain at least 32 characters. Only `VITE_DISCORD_CLIENT_ID` is included in the browser build.
+
+In the Discord Developer Portal:
+
+1. Enable Activities for the development application.
+2. Enable User Install and Guild Install contexts.
+3. Add the required placeholder OAuth redirect, such as `https://127.0.0.1`.
+4. Create the application bot; its token is required for Activity Instance API verification.
+5. Set Max Participants to `6`.
+6. Enable Web and Desktop initially.
+7. Keep the default `Launch` Entry Point command.
+
+Start the app:
+
+```powershell
+npm run dev
 ```
 
-Notes:
-- `SESSION_SECRET` should be a strong random string.
-- Discord values are required only if using OAuth login.
+For recommended proxy testing, run an HTTPS tunnel to port 8900:
 
-## Project Structure
+```powershell
+cloudflared tunnel --url http://localhost:8900
+```
 
-- `src/main.ts` – Client entry; UI/menu flow, auth, session handling.
-- `src/game/SpellcastGame.ts` – Core client game logic, rendering, animations, modals.
-- `src/game/WordBoard.ts` – Three.js board representation; tile bag logic, multipliers, vowels, refreshes.
-- `src/server/server.ts` – Express server, socket wiring, Discord OAuth routes.
-- `src/server/gameState.ts` – Server game rules, turn/round handling, scoring, letter bag, multipliers.
-- `src/shared` – Shared types/constants between client and server.
-- `src/style.css` – Global styles/theme and animation styling.
-- `docs/` – Planning docs (Discord OAuth, multiplayer, build plan).
+In **Activities → URL Mappings**, map `/` to the tunnel hostname without the protocol. Reset temporary mappings when the tunnel is no longer controlled. Launch the Activity from Discord's development Activity shelf; opening the production mode directly in a normal browser is expected to fail the SDK handshake.
 
-## Gameplay Notes
+The current Discord proxy accepts both `/api/...` and `/.proxy/api/...`; this project uses same-origin `/api/...` and `/socket.io/...` routes under the root mapping.
 
-- **Rounds & Multipliers**: Letter multipliers unlock from the start; 2W tile appears from Round 2 and repositions each round. Board state is retained between rounds (no shuffle/refresh), only the 2W tile moves.
-- **Vowels**: Letter bag enforces distribution; refresh logic tops up vowels to the minimum target.
-- **Power-ups**: Shuffle preserves multipliers/gems and repositions letters; Swap lets you pick a letter at the cost of gems.
+## Session and network security
 
-## Controls & UI
+- Discord user identity comes from the backend OAuth exchange, never client display data.
+- The backend verifies the claimed instance with `GET /applications/{application_id}/activity-instances/{instance_id}` using the application bot token.
+- The verified Discord user must appear in the instance's `users` list.
+- The application session cookie uses `Secure; HttpOnly; SameSite=None; Partitioned` in production and is scoped to `{clientId}.discordsays.com`.
+- HTTP and Socket.IO actions derive user and instance from the session. Client-supplied actor IDs are ignored.
+- Production origins are restricted to the application's `discordsays.com` origin plus explicitly configured origins.
+- Authorization codes are single-use and additionally replay-tracked for the session window.
+- Test mode is rejected whenever `NODE_ENV=production`.
 
-- **Submitting Words**: Select adjacent tiles; valid words score and trigger the draw animation.
-- **Power-ups**: Buttons in the power panel (Shuffle, Swap Letter).
-- **Modals**: Leave game, activity log, dictionary search, kick/skip confirmation, removed-from-game notification.
-- **Auth**: Login/Logout with Discord when configured; shows session tag in the main menu.
+## Native Activity behavior
+
+- Users auto-create or auto-join the room for their verified `instanceId`.
+- Discord display names and avatars populate the roster.
+- Invite Friends calls Discord's native `openInviteDialog()` command.
+- Layout events provide focused, grid, and PIP presentation states.
+- Thermal events reduce nonessential visual effects.
+- Leaving removes the authenticated player and closes the Activity SDK session.
+- Multiple sockets for the same Discord user resume one player record.
+- Disconnects receive a five-minute reconnection grace period.
+
+## Build and validation
+
+```powershell
+npm run typecheck
+npm run test:run
+npm run build
+npm run verify
+```
+
+Production:
+
+```powershell
+npm run build
+npm start
+```
+
+The Docker image builds and runs on Node 24 Alpine and uses `npm ci` for deterministic installation.
 
 ## Deployment
 
-- Build with `npm run build`.
-- Set env vars in your hosting platform (e.g., Railway) for server-side values and Discord OAuth.
-- Serve `dist/server/index.mjs` with Node; client assets live in `dist/client`.
+Serve the Vite client, `/api/activity/*`, and `/socket.io/*` from one HTTPS host. The host must support WebSocket upgrades. Deploy exactly one replica while rooms remain in memory.
 
-## Tests
+### Railway configuration
 
-- Run all tests: `npm test`
-- Coverage includes server, offline adapter, and shared rules (Vitest). Offline adapter tests use a deterministic RNG hook for stability.
+Add these service variables in Railway before deploying from `main`:
 
-## Testing Tips
+| Variable | Required | Exposure | Value |
+| --- | --- | --- | --- |
+| `VITE_DISCORD_CLIENT_ID` | Yes | Public build-time | Discord Application ID. Must match `DISCORD_CLIENT_ID`. |
+| `VITE_DISCORD_INSTALL_URL` | No | Public build-time | Optional Discord-provided install-link override. The website otherwise derives the standard link from `VITE_DISCORD_CLIENT_ID`. |
+| `DISCORD_CLIENT_ID` | Yes | Server runtime | The same Discord Application ID. |
+| `DISCORD_CLIENT_SECRET` | Yes | Secret runtime | OAuth2 client secret from the Discord Developer Portal. |
+| `DISCORD_BOT_TOKEN` | Yes | Secret runtime | Bot token used to verify Activity instance membership. |
+| `SESSION_SECRET` | Yes | Secret runtime | Random value of at least 32 characters used to sign application sessions. |
+| `NODE_ENV` | Recommended | Server runtime | Set to `production`; the Docker image also defaults it to production. |
+| `ACTIVITY_ALLOWED_ORIGINS` | No | Server runtime | Comma-separated additional staging or tunnel origins. The production `discordsays.com` origin is added automatically. |
 
-- Verify vowel distribution after round advance (board retained, 2W moves).
-- Check shuffle and swap power-ups adjust gems correctly.
-- Test Discord login flow (login/logout, auto name, bypass name prompt).
-- Multiplayer: ensure host kick/skip works and modals display; spectators handled correctly.
-- Animations: submission stroke draw, underline reveal, dot sparkles, fly-off to player card.
+Do not set `ACTIVITY_TEST_MODE` or `VITE_ACTIVITY_TEST_MODE` in Railway. Railway supplies `PORT`; do not hard-code it. The Dockerfile declares only the public `VITE_*` variables as build arguments so Vite can embed them without exposing server secrets. Updating either public variable requires a rebuild.
 
-## License
+For the current unlisted rollout, enable **Public Bot**, keep both installation contexts enabled, select **Discord Provided Link**, and leave **Discovery** disabled. The website exposes that direct installation link without listing the Activity in public search. Installation does not bypass Discord's unverified-Activity rule: launching remains limited to approved App Testers and development-team members until Discord verifies the Activity.
 
-This project is provided without an explicit license; treat as all rights reserved unless a license is added.
+Recommended Railway service settings:
+
+- Keep exactly one replica while rooms remain in memory.
+- Use `/api/health` as the health-check path.
+- Keep the default Dockerfile build and start command.
+- Point the `wordsandwizards.app` custom domain at this service and retain WebSocket support.
+
+In the Discord Developer Portal, map Activity prefix `/` to `wordsandwizards.app` without `https://`, enable Activities and the supported platforms, keep the default `Launch` Entry Point command, and configure both User Install and Guild Install contexts. A non-distributed Activity is visible only to the application owner and development team; complete Discord distribution/discovery setup before promising access to all website visitors.
+
+Set all server credentials in the hosting platform secret manager. Before release, verify the built client contains none of `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, or `SESSION_SECRET`, and complete a real proxy session covering invite, two users, gameplay, reconnect, host transfer, and leave.
+
+The remaining Developer Portal, artwork, Privacy Policy, Terms of Service, staging mapping, and distribution steps are tracked in `docs/discord-activity-migration-plan.md`.
+
+## Primary Discord references
+
+- [Building an Activity](https://docs.discord.com/developers/activities/building-an-activity)
+- [Embedded App SDK](https://docs.discord.com/developers/developer-tools/embedded-app-sdk)
+- [Multiplayer instances](https://docs.discord.com/developers/activities/development-guides/multiplayer-experience)
+- [Activity networking and cookies](https://docs.discord.com/developers/activities/development-guides/networking)
+- [Local development and URL mappings](https://docs.discord.com/developers/activities/development-guides/local-development)

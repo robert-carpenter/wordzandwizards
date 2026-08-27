@@ -1,5 +1,5 @@
 import { GEM_TARGET, LETTER_COUNTS, LETTER_VALUES, MIN_VOWELS, VOWELS } from "../shared/constants.js";
-import { GameSnapshot, LastSubmission, TileModel } from "../shared/gameTypes.js";
+import { GameSnapshot, LastSubmission, TileModel, type WordMultiplier } from "../shared/gameTypes.js";
 import { GameState, Player, Room } from "./types.js";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

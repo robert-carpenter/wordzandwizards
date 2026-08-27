@@ -4,12 +4,15 @@ import type { ChatMessage } from "../shared/chat.js";
 export interface Player {
   id: string;
   name: string;
+  username?: string;
+  avatar?: string;
   isHost: boolean;
   score: number;
   gems: number;
   joinedAt: number;
   connected: boolean;
   isSpectator: boolean;
+  lastActiveAt?: number;
 }
 
 export interface GameState extends GameSnapshot {
@@ -19,6 +22,7 @@ export interface GameState extends GameSnapshot {
 
 export interface Room {
   id: string;
+  activityInstanceId: string;
   createdAt: number;
   hostId: string;
   players: Player[];

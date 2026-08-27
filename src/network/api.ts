@@ -1,9 +1,12 @@
 import type { GameSnapshot } from "../shared/gameTypes";
 import type { ChatMessage } from "../shared/chat";
+import type { ActivityAuthExchangeResponse } from "../activity/activityContext";
 
 export interface RoomPlayerDTO {
   id: string;
   name: string;
+  username?: string;
+  avatar?: string;
   isHost: boolean;
   score: number;
   gems: number;
@@ -13,6 +16,7 @@ export interface RoomPlayerDTO {
 
 export interface RoomDTO {
   id: string;
+  activityInstanceId: string;
   players: RoomPlayerDTO[];
   hostId: string;
   status: "lobby" | "in-progress";
@@ -21,90 +25,78 @@ export interface RoomDTO {
   chat: ChatMessage[];
 }
 
-export interface CreateRoomResponse {
-  roomId: string;
-  player: RoomPlayerDTO;
+export interface ActivityRoomJoinResponse {
   room: RoomDTO;
+  player: RoomPlayerDTO;
 }
 
-export interface JoinRoomResponse extends CreateRoomResponse {}
-
-const API_BASE = (() => {
-  const configured = import.meta.env.VITE_SERVER_URL;
-  if (configured && configured.trim().length) {
-    return configured;
+export class ActivityApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string
+  ) {
+    super(message);
+    this.name = "ActivityApiError";
   }
-  return typeof window !== "undefined"
-    ? window.location.origin
-    : "http://localhost:8900";
-})();
+}
 
-async function request<T>(path: string, options: RequestInit): Promise<T> {
-  console.log("[client][api]", options?.method ?? "GET", path, options?.body ?? "");
-  const res = await fetch(`${API_BASE}${path}`, {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    credentials: "include",
+    ...options,
     headers: {
-      "Content-Type": "application/json"
-    },
-    ...options
+      "Content-Type": "application/json",
+      ...(options.headers ?? {})
+    }
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.warn("[client][api] error", path, err);
-    throw new Error(err.error ?? res.statusText);
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ActivityApiError(
+      payload.error || response.statusText || "Activity request failed.",
+      response.status,
+      payload.code
+    );
   }
-  console.log("[client][api] success", path);
-  return res.json();
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
 }
 
-export function createRoom(name: string): Promise<CreateRoomResponse> {
-  return request("/api/rooms", {
+export function exchangeActivityCode(input: {
+  code: string;
+  instanceId: string;
+}): Promise<ActivityAuthExchangeResponse> {
+  return request("/api/activity/auth/exchange", {
     method: "POST",
-    body: JSON.stringify({ name })
+    body: JSON.stringify(input)
   });
 }
 
-export function joinRoom(roomId: string, name: string): Promise<JoinRoomResponse> {
-  return request(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
-    method: "POST",
-    body: JSON.stringify({ name })
-  });
+export function joinActivityRoom(): Promise<ActivityRoomJoinResponse> {
+  return request("/api/activity/room/join", { method: "POST" });
 }
 
-export function getRoom(roomId: string): Promise<RoomDTO> {
-  return request(`/api/rooms/${encodeURIComponent(roomId)}`, {
-    method: "GET"
-  });
+export function getActivityRoom(): Promise<{ room: RoomDTO }> {
+  return request("/api/activity/room", { method: "GET" });
 }
 
-export function startRoom(roomId: string, playerId: string): Promise<{ room: RoomDTO }> {
-  return request(`/api/rooms/${encodeURIComponent(roomId)}/start`, {
-    method: "POST",
-    body: JSON.stringify({ playerId })
-  });
+export function startActivityRoom(): Promise<{ room: RoomDTO }> {
+  return request("/api/activity/room/start", { method: "POST" });
 }
 
-export function updateRoomRounds(
-  roomId: string,
-  playerId: string,
-  rounds: number
-): Promise<{ room: RoomDTO }> {
-  return request(`/api/rooms/${encodeURIComponent(roomId)}/settings`, {
+export function updateActivityRoomRounds(rounds: number): Promise<{ room: RoomDTO }> {
+  return request("/api/activity/room/settings", {
     method: "PATCH",
-    body: JSON.stringify({ playerId, rounds })
+    body: JSON.stringify({ rounds })
   });
 }
 
-export function leaveRoom(roomId: string, playerId: string, requesterId?: string): Promise<void> {
-  return request(`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(playerId)}`, {
-    method: "DELETE",
-    body: JSON.stringify({ requesterId: requesterId ?? playerId })
-  });
+export function leaveActivityRoom(): Promise<void> {
+  return request("/api/activity/room/leave", { method: "POST" });
 }
 
-export function kickPlayer(
-  roomId: string,
-  playerId: string,
-  requesterId: string
-): Promise<void> {
-  return leaveRoom(roomId, playerId, requesterId);
+export function kickActivityPlayer(userId: string): Promise<void> {
+  return request(`/api/activity/room/players/${encodeURIComponent(userId)}`, {
+    method: "DELETE"
+  });
 }

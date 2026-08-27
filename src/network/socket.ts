@@ -1,20 +1,10 @@
-import { io, Socket } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import type { RoomDTO } from "./api";
-
-const SOCKET_BASE = (() => {
-  const configured = import.meta.env.VITE_SERVER_URL;
-  if (configured && configured.trim().length) {
-    return configured;
-  }
-  return typeof window !== "undefined"
-    ? window.location.origin
-    : "http://localhost:8900";
-})();
 
 export interface RoomSocketHandlers {
   onRoomUpdate(room: RoomDTO): void;
   onDisconnect(reason: string): void;
-  onError?(message: string): void;
+  onError?(message: string, code?: string): void;
   onGameError?(message: string): void;
   onSelection?(playerId: string, tileIds: string[]): void;
   onKicked?(): void;
@@ -22,74 +12,49 @@ export interface RoomSocketHandlers {
   onReconnect?(): void;
 }
 
-export type RoomSocket = Socket<{
+interface ServerToClientEvents {
   "room:update": (room: RoomDTO) => void;
-  "room:error": (payload: { message: string }) => void;
+  "room:error": (payload: { message: string; code?: string }) => void;
   "game:selection": (payload: { playerId: string; tileIds: string[] }) => void;
   "game:error": (payload: { message: string }) => void;
-  "room:kicked": (payload: { roomId: string }) => void;
-  "game:skip": (payload: { playerId?: string }) => void;
-}> &
-  Socket;
+  "room:kicked": (payload: { instanceId: string }) => void;
+}
 
-export function connectRoomSocket(
-  roomId: string,
-  playerId: string,
-  handlers: RoomSocketHandlers
-): RoomSocket {
-  console.log("[client][socket] connecting", roomId, playerId);
-  const socket = io(SOCKET_BASE, {
+interface ClientToServerEvents {
+  "game:submitWord": (payload: { tileIds: string[] }) => void;
+  "game:shuffle": () => void;
+  "game:swap:start": () => void;
+  "game:swap:apply": (payload: { tileId: string; letter: string }) => void;
+  "game:swap:cancel": () => void;
+  "game:selection": (payload: { tileIds: string[] }) => void;
+  "game:skip": (payload: { playerId: string }) => void;
+  "chat:send": (payload: { text: string }) => void;
+}
+
+export type RoomSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+export function connectActivitySocket(handlers: RoomSocketHandlers): RoomSocket {
+  const socket = io(window.location.origin, {
+    path: "/socket.io",
     transports: ["websocket"],
+    withCredentials: true,
     forceNew: true,
     reconnection: true,
-    auth: { roomId, playerId }
+    reconnectionDelayMax: 5_000
   }) as RoomSocket;
 
-  socket.on("room:update", (room: RoomDTO) => {
-    console.log("[client][socket] room:update", room.id, room.status);
-    handlers.onRoomUpdate(room);
-  });
-
-  socket.on("room:error", (payload: { message: string }) => {
-    console.warn("[client][socket] room:error", payload);
-    handlers.onError?.(payload.message);
+  socket.on("room:update", handlers.onRoomUpdate);
+  socket.on("room:error", (payload) => {
+    handlers.onError?.(payload.message, payload.code);
     socket.disconnect();
   });
-
-  socket.on("game:error", (payload: { message: string }) => {
-    console.warn("[client][socket] game:error", payload);
-    handlers.onGameError?.(payload.message);
-  });
-
-  socket.on("game:selection", (payload: { playerId: string; tileIds: string[] }) => {
-    console.log("[client][socket] game:selection", payload);
-    handlers.onSelection?.(payload.playerId, payload.tileIds ?? []);
-  });
-
-  socket.on("room:kicked", () => {
-    console.warn("[client][socket] room:kicked");
-    handlers.onKicked?.();
-  });
-
-  socket.on("connect_error", (err) => {
-    console.warn("[client][socket] connect_error", err);
-    handlers.onError?.(err.message ?? "Connection error");
-  });
-
-  socket.on("disconnect", (reason) => {
-    console.log("[client][socket] disconnect", reason);
-    handlers.onDisconnect(reason);
-  });
-
-  socket.on("connect", () => {
-    console.log("[client][socket] connected");
-    handlers.onConnect?.();
-  });
-
-  socket.io.on("reconnect", () => {
-    console.log("[client][socket] reconnect");
-    handlers.onReconnect?.();
-  });
+  socket.on("game:error", (payload) => handlers.onGameError?.(payload.message));
+  socket.on("game:selection", (payload) => handlers.onSelection?.(payload.playerId, payload.tileIds ?? []));
+  socket.on("room:kicked", () => handlers.onKicked?.());
+  socket.on("connect_error", (error) => handlers.onError?.(error.message, "SOCKET_CONNECT_FAILED"));
+  socket.on("disconnect", handlers.onDisconnect);
+  socket.on("connect", () => handlers.onConnect?.());
+  socket.io.on("reconnect", () => handlers.onReconnect?.());
 
   return socket;
 }

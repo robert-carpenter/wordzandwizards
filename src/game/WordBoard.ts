@@ -4,6 +4,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  SRGBColorSpace,
   Texture,
   DoubleSide
 } from "three";
@@ -1000,61 +1001,135 @@ export class WordBoard extends Group {
       context.closePath();
     };
 
-    const palette: Record<TileState, { bg: string; text: string; shadow: string }> = {
-      base: { bg: "#f8f9fb", text: "#111111", shadow: "rgba(0,0,0,0.25)" },
-      hover: { bg: "#d8dbe3", text: "#111111", shadow: "rgba(0,0,0,0.22)" },
-      selected: { bg: "#39b9ff", text: "#f7fbff", shadow: "rgba(8, 85, 140, 0.55)" }
+    const palette: Record<
+      TileState,
+      { top: string; bottom: string; border: string; text: string; shadow: string }
+    > = {
+      base: {
+        top: "#fffdf8",
+        bottom: "#dce9f2",
+        border: "#a9c4d7",
+        text: "#10263f",
+        shadow: "rgba(7, 28, 50, 0.32)"
+      },
+      hover: {
+        top: "#f9feff",
+        bottom: "#cdeeff",
+        border: "#70d4ff",
+        text: "#10263c",
+        shadow: "rgba(31, 141, 196, 0.28)"
+      },
+      selected: {
+        top: "#72e3ff",
+        bottom: "#249cd9",
+        border: "#bff4ff",
+        text: "#ffffff",
+        shadow: "rgba(5, 82, 132, 0.55)"
+      }
     };
 
     const colors = palette[state];
 
-    ctx.fillStyle = colors.bg;
-    drawRoundedRect(ctx, 8, 8, size - 16, size - 16, 16);
+    ctx.save();
+    ctx.shadowColor = state === "selected" ? "rgba(22, 144, 201, 0.48)" : "rgba(4, 20, 39, 0.24)";
+    ctx.shadowBlur = state === "selected" ? 18 : 11;
+    ctx.shadowOffsetY = 5;
+    const tileGradient = ctx.createLinearGradient(0, 8, 0, size - 8);
+    tileGradient.addColorStop(0, colors.top);
+    tileGradient.addColorStop(1, colors.bottom);
+    ctx.fillStyle = tileGradient;
+    drawRoundedRect(ctx, 10, 8, size - 20, size - 22, 20);
     ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = state === "selected" ? 7 : 4;
+    drawRoundedRect(ctx, 10, 8, size - 20, size - 22, 20);
+    ctx.stroke();
+
+    ctx.strokeStyle = state === "selected" ? "rgba(255,255,255,0.46)" : "rgba(255,255,255,0.75)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(30, 28);
+    ctx.lineTo(size - 30, 28);
+    ctx.stroke();
 
     ctx.fillStyle = colors.text;
-    ctx.font = "bold 140px Play, 'Segoe UI', sans-serif";
+    ctx.font = "bold 134px Play, 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.shadowColor = colors.shadow;
-    ctx.shadowBlur = state === "selected" ? 22 : 14;
-    ctx.fillText(letter, size / 2, size / 2 + 5);
+    ctx.shadowBlur = state === "selected" ? 16 : 9;
+    ctx.fillText(letter, size / 2, size / 2 + 1);
 
     // Draw letter value bottom right
     const valueColor =
-      state === "selected" ? "rgba(245,249,255,0.95)" : "rgba(0,0,0,0.78)";
+      state === "selected" ? "rgba(248,253,255,0.96)" : "rgba(28,49,70,0.8)";
     const baseValue = LETTER_VALUES[letter.toLowerCase()] ?? 0;
     const multiplierValue =
       multiplier === "tripleLetter" ? 3 : multiplier === "doubleLetter" ? 2 : 1;
     const value = baseValue * multiplierValue;
     if (value) {
       ctx.fillStyle = valueColor;
-      ctx.font = "bold 46px 'Segoe UI', sans-serif";
+      ctx.font = "bold 42px 'Segoe UI', sans-serif";
       ctx.textAlign = "right";
       ctx.textBaseline = "bottom";
       ctx.shadowColor = "rgba(0,0,0,0.15)";
       ctx.shadowBlur = 6;
-      ctx.fillText(String(value), size - 22, size - 18);
+      ctx.fillText(String(value), size - 25, size - 23);
     }
 
     if (hasGem) {
       ctx.save();
-      ctx.translate(size * 0.175, size * 0.825);
-      // Gem icon background
-      ctx.fillStyle = "#e61bf8ff";
+      ctx.translate(size * 0.19, size * 0.79);
+
+      // High-contrast reward badge. Drawing the facets directly keeps the gem
+      // legible even when icon fonts have not finished loading.
+      ctx.shadowColor = "rgba(64, 8, 76, 0.62)";
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      const gemBadgeGradient = ctx.createLinearGradient(0, -31, 0, 31);
+      gemBadgeGradient.addColorStop(0, "#ff6aee");
+      gemBadgeGradient.addColorStop(1, "#c719c9");
+      ctx.fillStyle = gemBadgeGradient;
       ctx.beginPath();
-      ctx.arc(0, 0, 25, 0, Math.PI * 2);
+      ctx.arc(0, 0, 32, 0, Math.PI * 2);
       ctx.fill();
-      // FontAwesome gem glyph (fa-gem, unicode f3a5)
-      ctx.fillStyle = "#ffffffff";
-      ctx.font = "bold 36px 'Font Awesome 6 Free', 'Font Awesome 5 Free', 'FontAwesome', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("\uf3a5", 0, 2);
+      ctx.shadowColor = "transparent";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#8b168f";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-18, -7);
+      ctx.lineTo(-11, -17);
+      ctx.lineTo(11, -17);
+      ctx.lineTo(18, -7);
+      ctx.lineTo(0, 17);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(178, 35, 180, 0.75)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-18, -7);
+      ctx.lineTo(18, -7);
+      ctx.moveTo(-11, -17);
+      ctx.lineTo(0, 17);
+      ctx.moveTo(11, -17);
+      ctx.lineTo(0, 17);
+      ctx.stroke();
       ctx.restore();
     }
 
     const texture = new CanvasTexture(canvas);
+    // Canvas colors are authored in sRGB; tagging them prevents Three.js from
+    // lifting dark text and saturated gems into a washed-out display range.
+    texture.colorSpace = SRGBColorSpace;
     texture.needsUpdate = true;
     return texture;
   }

@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
-    target: "node18",
+    target: "node24",
     ssr: "src/server/server.ts",
     outDir: "dist/server",
     emptyOutDir: false,
@@ -12,7 +12,6 @@ export default defineConfig({
         "cors",
         "express",
         "socket.io",
-        "uuid",
         "http",
         "fs",
         "path",
@@ -26,6 +25,6 @@ export default defineConfig({
     }
   },
   ssr: {
-    external: ["cors", "express", "socket.io", "uuid"]
+    external: ["cors", "express", "socket.io"]
   }
 });

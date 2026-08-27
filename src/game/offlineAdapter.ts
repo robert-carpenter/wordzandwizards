@@ -26,6 +26,7 @@ export class OfflineAdapter {
     this.rng = options?.rng;
     this.room = {
       id: "local-room",
+      activityInstanceId: "local-room",
       createdAt: Date.now(),
       hostId: "local-player",
       status: "in-progress",
